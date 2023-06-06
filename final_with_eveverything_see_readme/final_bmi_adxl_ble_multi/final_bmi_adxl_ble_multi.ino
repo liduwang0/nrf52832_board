@@ -7,7 +7,7 @@
 #include "myadxl362.h"
 #include "Arduino.h"
 #include <SD.h>
-
+String buffer = "";
 
 int gyr_detecter = 0;
 long motion_sensor_time_interval = 80;
@@ -217,7 +217,7 @@ void loop() {
   if (((currentTime - prevTime_T4) > interval_T4) && (bmiflag == 1)) {
     unsigned long offset1 = 0;  // 时间偏移量
     unsigned long currentTime = millis();
-    
+
 
     unsigned long startTime = micros();  // 记录开始时间
     // 执行一些代码
@@ -411,30 +411,44 @@ void loop() {
 
     int16_t input_data[9] = { acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, adxl_XData, adxl_YData, adxl_ZData };
 
-    char buffer[20000];  //必须很大，不然会出现乱码
+      //必须很大，不然会出现乱码
+    Serial.println("CURRENT TIME.");
+    Serial.println(currentTime);
+    // offset += sprintf(buffer + offset, "%lu", currentTime);
+    // offset += sprintf(buffer + offset, ",");
 
-    offset += sprintf(buffer + offset, "%lu", currentTime);
-    offset += sprintf(buffer + offset, ",");
+    // for (int i = 0; i < 9; i++) {  //这里不能是sizeof input，不然数据是16个
+    //   offset += sprintf(buffer + offset, "%d", input_data[i]);
 
-    for (int i = 0; i < 9; i++) {  //这里不能是sizeof input，不然数据是16个
-      offset += sprintf(buffer + offset, "%d", input_data[i]);
+    //   // Add comma delimiter for all elements except the last one
+    //   if (i < 8) {
+    //     offset += sprintf(buffer + offset, ",");
+    //   }
+    // }
+    buffer += String(currentTime);
+    buffer += ",";
+
+    for (int i = 0; i < 9; i++) {
+      buffer += String(input_data[i]);
 
       // Add comma delimiter for all elements except the last one
       if (i < 8) {
-        offset += sprintf(buffer + offset, ",");
+        buffer += ",";
       }
     }
-    Serial.println("offset.");
-    Serial.println(offset);
-    buffer[offset++] = '\n';  //最后添加换行
-                              // Serial.println("offst...");
-                              //   Serial.println(offset);
-    if (offset > 5000) {
-      // delay(10);
+     buffer += "\n";
+    Serial.println("buffer.length().");
+    Serial.println(buffer.length());
+    //buffer[offset++] = '\n';  //最后添加换行
+    // Serial.println("offst...");
+    //   Serial.println(offset);
+    if (buffer.length() > 4096) {
+
+      //delay(5);
       //
       //不能在开头初始化，不然会影响spi传输，
       SD.begin(27);
-      // delay(10);
+      //delay(5);
       //my_sd_File = SD.open("test.csv", FILE_WRITE);
       // int sd_file_length = strlen(sd_filename_store_outside_loop);
       // char sd_name_buffer[sd_file_length + 1];
@@ -445,12 +459,13 @@ void loop() {
 
       if (my_sd_File) {
 
-
+        //delay(5);
 
         // Serial.print("Writing to data.csv...");
-        my_sd_File.write(buffer, offset);
-        offset = 0;
+        my_sd_File.write((const uint8_t*)buffer.c_str(), buffer.length());
+        offset = 0;          //名字太长的受offet超过5000了，说明根本不没有进入这里
         my_sd_File.close();  //
+        buffer = "";
         // Serial.println("sd_filename wonr?");
         // Serial.println(sd_filename);
       }
@@ -461,8 +476,8 @@ void loop() {
     if (automatical_time_interval_function_switch == 1) {
       automatical_time_interval_counter++;
       gyr_detecter = gyr_detecter + abs(gyr_z);
-      if (automatical_time_interval_counter == 10) {
-        gyr_detecter = gyr_detecter / 10;  // 玄学，如果这里没有除法，写入文件不会出错
+      if (automatical_time_interval_counter == 20) {
+        gyr_detecter = gyr_detecter / 20;  // 玄学，如果这里没有除法，写入文件不会出错
         gyr_detecter = (int)gyr_detecter;
         automatical_time_interval(gyr_detecter);
         automatical_time_interval_counter = 0;
@@ -766,4 +781,5 @@ void automatical_time_interval(int x) {
     motion_sensor_time_interval = 9;
   }
   interval_T4 = motion_sensor_time_interval;
+  //delay(10);
 }
