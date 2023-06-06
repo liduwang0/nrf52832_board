@@ -8,7 +8,9 @@
 #include "Arduino.h"
 #include <SD.h>
 
-int motion_sensor_time_interval = 80;
+
+int gyr_detecter = 0;
+long motion_sensor_time_interval = 80;
 #define adxl_slaveSelectPin 15
 long interval_T1 = 5;
 long interval_T3 = 5000;
@@ -101,7 +103,7 @@ void loop() {
         Serial.println(receivedMessage);
         receivedMessage.remove(receivedMessage.length() - 1);  // 这里必去去掉最后一个元素，我从mit2app收到的最后一个元素不知道是什么，但是由于这个元素，导致我储存的数据csv前两行会有便宜。应该是最后这个休止符导致的
         sd_filename = receivedMessage;
-        offset=0;         // 原来bug在这里，当我更改文件名的时候，需要把offset清零，不然是从上次断点开始计数，比如从200开始存数据，那么前面两百可能就有坏数据
+        offset = 0;  // 原来bug在这里，当我更改文件名的时候，需要把offset清零，不然是从上次断点开始计数，比如从200开始存数据，那么前面两百可能就有坏数据
         //每次改名字的时候打头，，汇报暂时不加
         //   SD.begin(27);
 
@@ -394,13 +396,7 @@ void loop() {
     // BMI_init_status = bmi2xx.readRegister(INT_STATUS, 2);
     // Serial.println(BMI_init_status);
 
-    if (automatical_time_interval_function_switch == 1) {
-      automatical_time_interval_counter++;
-      if (automatical_time_interval_counter == 5) {
-        automatical_time_interval(gyr_x, gyr_y, gyr_z);
-        automatical_time_interval_counter = 0;
-      }
-    }
+
 
 
     //  Serial.print("sdname=");
@@ -431,9 +427,11 @@ void loop() {
         offset += sprintf(buffer + offset, ",");
       }
     }
-
+    Serial.println("offset.");
+    Serial.println(offset);
     buffer[offset++] = '\n';  //最后添加换行
-
+                              // Serial.println("offst...");
+                              //   Serial.println(offset);
     if (offset > 5000) {
       // delay(10);
       //
@@ -454,14 +452,26 @@ void loop() {
 
         // Serial.print("Writing to data.csv...");
         my_sd_File.write(buffer, offset);
+        offset = 0;
         my_sd_File.close();  //
         // Serial.println("sd_filename wonr?");
         // Serial.println(sd_filename);
       }
-      offset = 0;
     }
 
     prevTime_T4 = currentTime;
+
+    if (automatical_time_interval_function_switch == 1) {
+      automatical_time_interval_counter++;
+      gyr_detecter = gyr_detecter + abs(gyr_z);
+      if (automatical_time_interval_counter == 10) {
+        gyr_detecter = gyr_detecter / 10;  // 玄学，如果这里没有除法，写入文件不会出错
+        gyr_detecter = (int)gyr_detecter;
+        automatical_time_interval(gyr_detecter);
+        automatical_time_interval_counter = 0;
+        gyr_detecter = 0;
+      }
+    }
   }
 }
 
@@ -732,29 +742,31 @@ void motion_sensor_inteval_set(uint8_t bmi_hz_configure) {
   Serial.println(motion_sensor_time_interval);
 }
 
-void automatical_time_interval(int16_t x, int16_t y, int16_t z) {
+// void automatical_time_interval(int16_t x, int16_t y, int16_t z) {
 
-  int testnumer = abs(x) + abs(y) + abs(z);
- // Serial.print("testnumer:");
- // Serial.print(testnumer);
- // Serial.print("\t");
+void automatical_time_interval(int x) {
+  int testnumer = x;
+  //int testnumer = abs(x) + abs(y) + abs(z);
+  Serial.print("testnumer:");
+  Serial.print(testnumer);
+  // Serial.print("\t");
   if (testnumer <= 100) {
     motion_sensor_time_interval = 99;
   }
-  if (testnumer >= 100 && testnumer <= 500) {
+  if (testnumer >= 101 && testnumer <= 200) {
     motion_sensor_time_interval = 79;
   }
-  if (testnumer >= 500 && testnumer <= 2000) {
+  if (testnumer >= 201 && testnumer <= 400) {
     motion_sensor_time_interval = 59;
   }
-  if (testnumer >= 2000 && testnumer <= 4000) {
+  if (testnumer >= 401 && testnumer <= 600) {
     motion_sensor_time_interval = 39;
   }
-  if (testnumer >= 4000 && testnumer <= 6000) {
+  if (testnumer >= 601 && testnumer <= 800) {
     motion_sensor_time_interval = 19;
   }
-  if (testnumer >= 6000) {
+  if (testnumer >= 801) {
     motion_sensor_time_interval = 9;
   }
-  interval_T4 = motion_sensor_time_interval;
+  interval_T4 = (long)motion_sensor_time_interval;
 }
