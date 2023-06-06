@@ -217,10 +217,7 @@ void loop() {
   if (((currentTime - prevTime_T4) > interval_T4) && (bmiflag == 1)) {
     unsigned long offset1 = 0;  // 时间偏移量
     unsigned long currentTime = millis();
-    if (currentTime > 60000) {
-      offset1 = currentTime;
-    }
-    uint16_t actualTime = currentTime - offset1;
+    
 
     unsigned long startTime = micros();  // 记录开始时间
     // 执行一些代码
@@ -768,5 +765,5 @@ void automatical_time_interval(int x) {
   if (testnumer >= 801) {
     motion_sensor_time_interval = 9;
   }
-  interval_T4 = (long)motion_sensor_time_interval;
+  interval_T4 = motion_sensor_time_interval;
 }
