@@ -7,7 +7,13 @@
 #include "myadxl362.h"
 #include "Arduino.h"
 #include <SD.h>
+#include "mycompress.h"
+
+MYCOMPRESS compress_data;
+
 String buffer = "";
+
+
 
 int gyr_detecter = 0;
 long motion_sensor_time_interval = 80;
@@ -24,8 +30,12 @@ unsigned long prevTime_T4 = millis();
 bool shtflag = 0;
 
 int automatical_time_interval_counter = 0;
+
+
 bool automatical_time_interval_function_switch = 1;
 bool t_and_h_output_switch = 0;
+bool compress_switch = 0;
+
 
 int offset = 0;
 File my_sd_File;
@@ -410,8 +420,20 @@ void loop() {
     Serial.println(adxl_Temperature);
 
     int16_t input_data[9] = { acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, adxl_XData, adxl_YData, adxl_ZData };
+    int input_data_size = sizeof(input_data) / sizeof(input_data[0]);
 
-      //必须很大，不然会出现乱码
+    if (compress_switch == 1) {
+      int8_t* compressed_data = compress_data.scaleArray(input_data, input_data_size);
+      for (int i = 0; i < 9; i++) {
+        input_data[i] = compressed_data[i];
+      }
+    }
+
+
+
+
+
+    //必须很大，不然会出现乱码
     Serial.println("CURRENT TIME.");
     Serial.println(currentTime);
     // offset += sprintf(buffer + offset, "%lu", currentTime);
@@ -436,7 +458,7 @@ void loop() {
         buffer += ",";
       }
     }
-     buffer += "\n";
+    buffer += "\n";
     Serial.println("buffer.length().");
     Serial.println(buffer.length());
     //buffer[offset++] = '\n';  //最后添加换行
