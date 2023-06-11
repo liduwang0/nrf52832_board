@@ -13,11 +13,12 @@ int8_t* MYCOMPRESS::squareRootAndScaleArray(int16_t arr[], int size) {
   int8_t scaledArray[9];  // Assume size is always less than or equal to 100
   for (int i = 0; i < size; i++) {
     int16_t absVal = abs(arr[i]);
+    absVal=absVal/2;
     float sqrtVal = sqrt(absVal);
     if (arr[i] < 0) {      // 如果原始值是负数
       sqrtVal = -sqrtVal;  // 将平方根变为负数
     }
-    int8_t scaledVal = sqrtVal / 128;  // 缩放值以适应int8_t范围
+    int8_t scaledVal = sqrtVal;
     scaledArray[i] = scaledVal;  // 将缩放后的值存入数组
   }
   return scaledArray;
