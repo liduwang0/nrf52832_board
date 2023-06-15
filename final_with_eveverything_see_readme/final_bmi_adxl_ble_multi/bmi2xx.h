@@ -472,7 +472,7 @@ class BMI2xx
 		unsigned int readRegister(byte thisRegister, int bytesToRead);
 		void writeRegister(byte thisRegister, byte thisValue);
 		void Upload_file(int config_size, int file_count, byte* filepos_);
-    void customized_mode_bmi(uint8_t PWR_control, uint8_t ACC_config, uint8_t GYR_config);
+    void customized_mode_bmi(uint8_t PWR_control, uint8_t ACC_config, uint8_t GYR_config, uint8_t ACC_range_config, uint8_t GYR_range_config);
     void Upload_ConfigFile(byte thisRegister,int config_size_, byte* filepos_);
 
     
