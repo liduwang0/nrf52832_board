@@ -54,22 +54,28 @@ void BMI2xx::writeRegister(byte thisRegister, byte thisValue) {
   delay(1);
 }
 
-void BMI2xx::customized_mode_bmi(uint8_t PWR_control, uint8_t ACC_config, uint8_t GYR_config) {
+void BMI2xx::customized_mode_bmi(uint8_t PWR_control, uint8_t ACC_config, uint8_t GYR_config, uint8_t ACC_range_config, uint8_t GYR_range_config) {
 
- SPI.setDataMode(SPI_MODE3);
 
-   delay(1);
+SPI.setDataMode(SPI_MODE3);
+  delay(1);
+
+
   writeRegister(PWR_CTRL,PWR_control); //00000110 temp off, acc on, gyr on, aux off
 
   writeRegister(ACC_CONF,ACC_config); //0 000 0111  power optimized, no averaging, 25Hz
 
   writeRegister(GYR_CONF,GYR_config); //0 0 00 0110  power optimized, power optimized, no averaging, 25Hz
 
+  writeRegister(0x41,ACC_range_config); // acc range
+
+  writeRegister(0x43,GYR_range_config); // gyr range
+  
   writeRegister(PWR_CONF,0x03); // 00000 011  fast power up disable, FIFO read enable, power save enable. 默认
   
   Serial.println("BMI270 mode write set up finished...");
 
-  delay(100);
+  delay(1);
 }
 
 void BMI2xx::Upload_file(int config_size_, int file_count_, byte* filepos_)
