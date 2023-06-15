@@ -4,9 +4,9 @@
 #include <SPI.h>
 #include <Wire.h>
 #include "bmi2xx.h"
-#include "myadxl362.h"
+
 #include "Arduino.h"
-#include <SD.h>
+#include "SD.h"
 #include "mycompress.h"
 
 MYCOMPRESS compress_data;
@@ -17,11 +17,12 @@ String buffer = "";
 
 int gyr_detecter = 0;
 long motion_sensor_time_interval = 80;
-#define adxl_slaveSelectPin 15
-long interval_T1 = 5;
-long interval_T3 = 5000;
-long interval_T4 = motion_sensor_time_interval;
-// print brightness of LED3 every 5 seconds
+
+long interval_T1_BLE = 5;
+long interval_T3_SHT40 = 5000;
+long interval_T4_BMI270 = motion_sensor_time_interval;
+
+
 bool bmiflag = 0;
 
 unsigned long prevTime_T1 = millis();
@@ -32,26 +33,26 @@ bool shtflag = 0;
 int automatical_time_interval_counter = 0;
 
 
-bool automatical_time_interval_function_switch = 1;
+bool automatical_time_interval_function_switch = 0;
 bool t_and_h_output_switch = 0;
 bool compress_switch = 0;
 
 
 int offset = 0;
 File my_sd_File;
-MYADXL362 adxl;
+
 MYSHT40 sht;
-int16_t adxl_XData = 0, adxl_YData = 0, adxl_ZData = 0, adxl_Temperature = 0;
+
 
 // int config_runtime_flag = 0;
 uint8_t bmi_pwr_control;  // 0
 
-uint8_t adxl_pwr_control;  // 1
-
-uint8_t bmi_acc_config;  // 2
+uint8_t acc_range_control;  // 1
+uint8_t gyr_range_control;  // 2
+uint8_t bmi_acc_config;  // 3
 uint8_t bmi_gyr_config;
 
-uint8_t adxl_hz_config;  // 3
+
 
 
 uint8_t te_hu_control;     // 4
@@ -103,7 +104,7 @@ void loop() {
   unsigned long currentTime = millis();
 
   // Task 1 : Blink LED1 (T1)
-  if (currentTime - prevTime_T1 > interval_T1) {
+  if (currentTime - prevTime_T1 > interval_T1_BLE) {
     BLECentral central = blePeripheral.central();
     if (central) {
       if (blePeripheral.available()) {
@@ -213,7 +214,7 @@ void loop() {
   }
 
   // Task 2 : Glow LED2 when BTN is pressed
-  if (((currentTime - prevTime_T3) > interval_T3) && (shtflag == 1)) {
+  if (((currentTime - prevTime_T3) > interval_T3_SHT40) && (shtflag == 1)) {
     if (t_and_h_output_switch == 1) {
       Sht40_Action_Callback();
       prevTime_T3 = currentTime;
@@ -224,7 +225,7 @@ void loop() {
 
 
   // Task 4 : print the brightness of LED3 in the serial monitor after every 5 seconds
-  if (((currentTime - prevTime_T4) > interval_T4) && (bmiflag == 1)) {
+  if (((currentTime - prevTime_T4) > interval_T4_BMI270) && (bmiflag == 1)) {
     unsigned long offset1 = 0;  // 时间偏移量
     unsigned long currentTime = millis();
 
@@ -277,29 +278,7 @@ void loop() {
     msb_gyr_z = SPI.transfer(0x00);
     digitalWrite(14, HIGH);
 
-
-
-
-    SPI.setDataMode(SPI_MODE0);
-
-
-
-    digitalWrite(adxl_slaveSelectPin, LOW);
-    SPI.transfer(0x0B);  // read instruction
-    SPI.transfer(0x0E);  // Start at XData Reg
-    adxl_XData = SPI.transfer(0x00);
-    adxl_XData = adxl_XData + (SPI.transfer(0x00) << 8);
-    adxl_YData = SPI.transfer(0x00);
-    adxl_YData = adxl_YData + (SPI.transfer(0x00) << 8);
-    adxl_ZData = SPI.transfer(0x00);
-    adxl_ZData = adxl_ZData + (SPI.transfer(0x00) << 8);
-    adxl_Temperature = SPI.transfer(0x00);
-    adxl_Temperature = adxl_Temperature + (SPI.transfer(0x00) << 8);
-
-
-
-    digitalWrite(adxl_slaveSelectPin, HIGH);
-    acc_x = ((int16_t)msb_acc_x << 8) | (int16_t)lsb_acc_x;
+acc_x = ((int16_t)msb_acc_x << 8) | (int16_t)lsb_acc_x;
     acc_y = ((int16_t)msb_acc_y << 8) | (int16_t)lsb_acc_y;
     acc_z = ((int16_t)msb_acc_z << 8) | (int16_t)lsb_acc_z;
 
@@ -330,73 +309,13 @@ void loop() {
     Serial.print("gyr_z = ");
     Serial.print(gyr_z);
     Serial.print("\t");
-
+    
+    Serial.println("");
     unsigned long endTime = micros();  // 记录结束时间
 
     unsigned long elapsedTime = endTime - startTime;  // 计算运行时间
 
-    //  Serial.print("Time elapsed: ");
-    //  Serial.print(elapsedTime);
-    // Serial.print("     ");
 
-    // acc_x |= ((uint16_t)msb_acc_x << 8) | (uint16_t)lsb_acc_x;
-
-    // Serial.print("acc_x = ");
-    // if ((acc_x >> 15) & 0x01 == 1) {
-    //   Serial.print("-");
-    //   acc_x = (~acc_x) + 1;
-    // }
-    // Serial.print(acc_x);
-    // Serial.print("\t");
-
-    // acc_y |= ((uint16_t)msb_acc_y << 8) | (uint16_t)lsb_acc_y;
-    // Serial.print("acc_y = ");
-    // if ((acc_y >> 15) & 0x01 == 1) {
-    //   Serial.print("-");
-    //   acc_y = (~acc_y) + 1;
-    // }
-    // Serial.print(acc_y);
-    // Serial.print("\t");
-
-    // acc_z |= ((uint16_t)msb_acc_z << 8) | (uint16_t)lsb_acc_z;
-    // Serial.print("acc_z = ");
-    // if ((acc_z >> 15) & 0x01 == 1) {
-    //   Serial.print("-");
-    //   acc_z = (~acc_z) + 1;
-    // }
-    // Serial.print(acc_z);
-    // Serial.print("\t");
-
-
-
-    // gyr_x |= ((uint16_t)msb_gyr_x << 8) | (uint16_t)lsb_gyr_x;
-    // Serial.print("gyr_x = ");
-    // if ((gyr_x >> 15) & 0x01 == 1) {
-    //   Serial.print("-");
-    //   gyr_x = (~gyr_x) + 1;
-    // }
-    // Serial.print(gyr_x);
-    // Serial.print("\t");
-
-    // gyr_y |= ((uint16_t)msb_gyr_y << 8) | (uint16_t)lsb_gyr_y;
-    // Serial.print("gyr_y = ");
-    // if ((gyr_y >> 15) & 0x01 == 1) {
-    //   Serial.print("-");
-    //   gyr_y = (~gyr_y) + 1;
-    // }
-    // Serial.print(gyr_y);
-    // Serial.print("\t");
-
-    // gyr_z |= ((uint16_t)msb_gyr_z << 8) | (uint16_t)lsb_gyr_z;
-    // Serial.print("gyr_z = ");
-    // if ((gyr_z >> 15) & 0x01 == 1) {
-    //   Serial.print("-");
-    //   gyr_z = (~gyr_z) + 1;
-    // }
-    // Serial.print(gyr_z);
-
-    Serial.print("\t");
-    //Serial.println("\t");
 
 
     // Serial.print("BMI ST:");
@@ -410,21 +329,13 @@ void loop() {
     //Serial.print(sd_filename);
 
 
-    Serial.print("XVALUE=");
-    Serial.print(adxl_XData);
-    Serial.print("\tYVALUE=");
-    Serial.print(adxl_YData);
-    Serial.print("\tZVALUE=");
-    Serial.print(adxl_ZData);
-    Serial.print("\tTEMPERATURE=");
-    Serial.println(adxl_Temperature);
 
-    int16_t input_data[9] = { acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, adxl_XData, adxl_YData, adxl_ZData };
+    int16_t input_data[6] = { acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z };
     int input_data_size = sizeof(input_data) / sizeof(input_data[0]);
 
     if (compress_switch == 1) {
       int8_t* compressed_data = compress_data.scaleArray(input_data, input_data_size);
-      for (int i = 0; i < 9; i++) {
+      for (int i = 0; i < 6; i++) {
         input_data[i] = compressed_data[i];
       }
     }
@@ -434,8 +345,8 @@ void loop() {
 
 
     //必须很大，不然会出现乱码
-    Serial.println("CURRENT TIME.");
-    Serial.println(currentTime);
+    // Serial.println("CURRENT TIME.");
+    // Serial.println(currentTime);
     // offset += sprintf(buffer + offset, "%lu", currentTime);
     // offset += sprintf(buffer + offset, ",");
 
@@ -450,17 +361,17 @@ void loop() {
     buffer += String(currentTime);
     buffer += ",";
 
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 6; i++) {
       buffer += String(input_data[i]);
 
       // Add comma delimiter for all elements except the last one
-      if (i < 8) {
+      if (i < 5) {
         buffer += ",";
       }
     }
     buffer += "\n";
-    Serial.println("buffer.length().");
-    Serial.println(buffer.length());
+    //Serial.println("buffer.length().");
+    //Serial.println(buffer.length());
     //buffer[offset++] = '\n';  //最后添加换行
     // Serial.println("offst...");
     //   Serial.println(offset);
@@ -501,7 +412,7 @@ void loop() {
       if (automatical_time_interval_counter == 20) {
         gyr_detecter = gyr_detecter / 20;  // 玄学，如果这里没有除法，写入文件不会出错
         gyr_detecter = (int)gyr_detecter;
-        automatical_time_interval(gyr_detecter);
+        automatical_time_interval_curve(gyr_detecter);
         automatical_time_interval_counter = 0;
         gyr_detecter = 0;
       }
@@ -517,7 +428,7 @@ void Sht40_Setup() {
 
   Wire.begin();
 
-  sht.customized_mode_sht40(0xF6);
+  
 
   delay(10);
   Serial.println("sht40 initialization setup finished...");
@@ -551,13 +462,13 @@ void NRFSetup_Callback() {
 
 
 
-  BMI_ADXL_Setup();
+  BMI_Setup();
 
 
   Sht40_Setup();
 }
 
-void BMI_ADXL_Setup() {
+void BMI_Setup() {
   // if (BMI_init_status != 1) { // 我发现BMI初始化放在这里最好，因为修改模式和初始化完全无关，我刚开始是放在BMI_ADXL_Action里面的，这导致第一次使用的时候很慢，要等待初始化完成，但是放在这里的话
   //                         // 在我配置手机蓝牙的时候，它自己就开始初始化了，我点START之后立马开始运行了，这样好得多
   // 绝了 ，这里配置不信，导致BMI只会输出acc数据，gyr一直为0，但是放在setup_callback就没事。  我最后妥协了，在nrfsetup callback里面呼叫了这个函数，变成顺序执行
@@ -570,8 +481,7 @@ void BMI_ADXL_Setup() {
   // }
 
   // adxl.Initialization(adxl_slaveSelectPin);
-  adxl.Initialization(adxl_slaveSelectPin);
-  Serial.println("adxl initialization set up finished...");
+
   if (BMI_init_status != 1) {  // 我发现BMI初始化放在这里最好，因为修改模式和初始化完全无关，我刚开始是放在BMI_ADXL_Action里面的，这导致第一次使用的时候很慢，要等待初始化完成，但是放在这里的话
                                // 在我配置手机蓝牙的时候，它自己就开始初始化了，我点START之后立马开始运行了，这样好得多
     while (1) {
@@ -734,22 +644,26 @@ void config_all_sensors() {
 
   bmi_pwr_control = received_config_from_ble[0];
 
-  adxl_pwr_control = received_config_from_ble[1];
+  acc_range_control = received_config_from_ble[1];
+  gyr_range_control = received_config_from_ble[2];
 
-  bmi_acc_config = received_config_from_ble[2];
-  bmi_gyr_config = received_config_from_ble[2];
-  motion_sensor_inteval_set(bmi_acc_config);  //  不同的采样率要对应不同的数据速率
+  
+  bmi_acc_config = received_config_from_ble[3];
+  bmi_gyr_config = received_config_from_ble[3];
+    
 
 
 
-  adxl_hz_config = received_config_from_ble[3];
+ 
 
   te_hu_control = received_config_from_ble[4];
 
   infrared_control = received_config_from_ble[5];
 
-  bmi2xx.customized_mode_bmi(bmi_pwr_control, bmi_acc_config, bmi_gyr_config);
-  adxl.customized_mode_adxl(adxl_pwr_control, adxl_hz_config);
+
+  Serial.println(gyr_range_control);
+  bmi2xx.customized_mode_bmi(bmi_pwr_control, bmi_acc_config, bmi_gyr_config, acc_range_control, gyr_range_control);  
+  motion_sensor_inteval_set(bmi_acc_config); //  不同的采样率要对应不同的数据速率
   sht.customized_mode_sht40(te_hu_control);
 }
 void motion_sensor_inteval_set(uint8_t bmi_hz_configure) {
@@ -771,7 +685,7 @@ void motion_sensor_inteval_set(uint8_t bmi_hz_configure) {
   if (bmi_hz_configure == 0x0a) {
     motion_sensor_time_interval = 2;  // should be 2.5, but egal, not important
   }
-  interval_T4 = motion_sensor_time_interval;
+  interval_T4_BMI270 = motion_sensor_time_interval;
   Serial.println("interval");
   Serial.println(motion_sensor_time_interval);
 }
@@ -783,7 +697,7 @@ void automatical_time_interval(int x) {
   //int testnumer = abs(x) + abs(y) + abs(z);
   Serial.print("testnumer:");
   Serial.print(testnumer);
-  // Serial.print("\t");
+  Serial.println("");
   if (testnumer <= 100) {
     motion_sensor_time_interval = 99;
   }
@@ -802,6 +716,25 @@ void automatical_time_interval(int x) {
   if (testnumer >= 801) {
     motion_sensor_time_interval = 9;
   }
-  interval_T4 = motion_sensor_time_interval;
+  interval_T4_BMI270 = motion_sensor_time_interval;
+  //delay(10);
+}
+
+void automatical_time_interval_curve(int x) {
+  int testnumer = x;
+  //int testnumer = abs(x) + abs(y) + abs(z);
+  Serial.print("testnumer:");
+  Serial.print(testnumer);
+  Serial.println("");
+  if (testnumer >= 500) {
+    if (motion_sensor_time_interval > 10) {
+      motion_sensor_time_interval = motion_sensor_time_interval - 10;
+    }
+  } else if (testnumer <= 500) {
+    if (motion_sensor_time_interval<100) {
+      motion_sensor_time_interval = motion_sensor_time_interval + 10;
+    }
+  }
+  interval_T4_BMI270 = motion_sensor_time_interval;
   //delay(10);
 }
