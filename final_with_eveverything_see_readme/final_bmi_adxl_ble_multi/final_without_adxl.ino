@@ -158,6 +158,7 @@ void loop() {
       // central still connected to peripheral
 
       if (bmi_pwr_Characteristic.written()) {
+         digitalWrite(13, LOW);
         received_config_from_ble[0] = bmi_pwr_Characteristic.value();
       }
       if (acc_range_Characteristic.written()) {
