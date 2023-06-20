@@ -14,7 +14,6 @@ MYCOMPRESS compress_data;
 String buffer = "";
 
 
-
 int gyr_detecter = 0;
 long motion_sensor_time_interval = 80;
 
@@ -33,7 +32,7 @@ bool shtflag = 0;
 int automatical_time_interval_counter = 0;
 
 
-bool automatical_time_interval_function_switch = 0;
+uint8_t automatical_time_interval_function_switch = 0x00;
 bool t_and_h_output_switch = 0;
 bool compress_switch = 0;
 
@@ -52,15 +51,16 @@ uint8_t gyr_range_control;  // 2
 uint8_t bmi_acc_config;     // 3
 uint8_t bmi_gyr_config;
 
+uint8_t compressive_sensing_control;  // 4
+uint8_t data_compression_control;     // 5
 
 
-
-uint8_t te_hu_control;     // 4
-uint8_t infrared_control;  // 5
+uint8_t te_hu_control;     // 6
+uint8_t infrared_control;  // 7
 
 int config_from_ble_counter = 0;  //因为收到的数字我需要++ ，总不能加到7 8 9把，每次到+到6的时候就会清零。从头开始储存参数
 
-uint8_t received_config_from_ble[7];
+uint8_t received_config_from_ble[8];
 
 
 
@@ -76,8 +76,10 @@ BLECharCharacteristic bmi_pwr_Characteristic = BLECharCharacteristic("19B10001-E
 BLECharCharacteristic acc_range_Characteristic = BLECharCharacteristic("19B10002-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
 BLECharCharacteristic gyr_range_Characteristic = BLECharCharacteristic("19B10003-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
 BLECharCharacteristic bmi_hz_Characteristic = BLECharCharacteristic("19B10004-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
-BLECharCharacteristic te_hu_Characteristic = BLECharCharacteristic("19B10005-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
-BLECharCharacteristic infrared_Characteristic = BLECharCharacteristic("19B10006-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
+BLECharCharacteristic compressive_sensing_Characteristic = BLECharCharacteristic("19B10005-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
+BLECharCharacteristic data_compression_Characteristic = BLECharCharacteristic("19B10006-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
+BLECharCharacteristic te_hu_Characteristic = BLECharCharacteristic("19B10007-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
+BLECharCharacteristic infrared_Characteristic = BLECharCharacteristic("19B10008-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
 
 
 BLEService Start_Service = BLEService("f2783635-3a07-4a51-9696-459ae784363e");  // 我发现只要一个lp_BLESerial blePeripheral就够了。我两个ttribute，到时候收到消息可以分辨是哪里收到了消息
@@ -158,7 +160,7 @@ void loop() {
       // central still connected to peripheral
 
       if (bmi_pwr_Characteristic.written()) {
-         digitalWrite(13, LOW);
+        digitalWrite(13, LOW);
         received_config_from_ble[0] = bmi_pwr_Characteristic.value();
       }
       if (acc_range_Characteristic.written()) {
@@ -170,14 +172,19 @@ void loop() {
       if (bmi_hz_Characteristic.written()) {
         received_config_from_ble[3] = bmi_hz_Characteristic.value();
       }
+      if (compressive_sensing_Characteristic.written()) {
+        received_config_from_ble[4] = compressive_sensing_Characteristic.value();
+      }
+      if (data_compression_Characteristic.written()) {
+        received_config_from_ble[5] = data_compression_Characteristic.value();
+      }
       if (te_hu_Characteristic.written()) {
-
-        received_config_from_ble[4] = te_hu_Characteristic.value();
+        received_config_from_ble[6] = te_hu_Characteristic.value();
       }
       if (infrared_Characteristic.written()) {
-        received_config_from_ble[5] = infrared_Characteristic.value();
+        received_config_from_ble[7] = infrared_Characteristic.value();
         Serial.print("Current config:  ");
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 8; i++) {
           Serial.print(received_config_from_ble[i], HEX);
           Serial.print(" ");
         }
@@ -185,260 +192,277 @@ void loop() {
         config_all_sensors();
         digitalWrite(13, HIGH);  // 放这里最合适，因为每次点了config device收到数据就直接配置了，不用去action开头判断 配置不配置
       }
-    
-
-    if (Start_Characteristic.written()) {
-      // Serial.print(Start_Characteristic.value(), HEX);
-      // Serial.println(" ");
-      if (Start_Characteristic.value() == 0x01) {
 
 
+      if (Start_Characteristic.written()) {
+        // Serial.print(Start_Characteristic.value(), HEX);
+        // Serial.println(" ");
+        if (Start_Characteristic.value() == 0x01) {
 
-        bmiflag = 1;
 
-        // Serial.println("sht.on_or_off_status");
-        // Serial.println(sht.on_or_off_status);
-        // if (sht.on_or_off_status == 1) {
-        //   runner.addTask(Sht40_Action);        // if等以后添加。因为这里添加后会失去一个功能，读取数据的时候不能配置device。
-        //   Sht40_Action.enable();
-        // }
 
-        shtflag = 1;
+          bmiflag = 1;
+
+          // Serial.println("sht.on_or_off_status");
+          // Serial.println(sht.on_or_off_status);
+          // if (sht.on_or_off_status == 1) {
+          //   runner.addTask(Sht40_Action);        // if等以后添加。因为这里添加后会失去一个功能，读取数据的时候不能配置device。
+          //   Sht40_Action.enable();
+          // }
+
+          shtflag = 1;
+        }
+        if (Start_Characteristic.value() == 0x00) {
+
+          bmiflag = 0;
+
+
+          shtflag = 0;
+
+          // config_runtime_flag = 0;
+
+
+          //                       pinMode(24, OUTPUT);
+          // digitalWrite(24, LOW);
+          //               pinMode(9, OUTPUT);
+          // digitalWrite(9, LOW);
+          //       pinMode(10, OUTPUT);
+          // digitalWrite(10, LOW);
+          //  Wire.end();
+        }
       }
-      if (Start_Characteristic.value() == 0x00) {
+      // Send a message over BLE
+      // bleSerial.println("Hello from NRF52832!");
+      //dummy, ble is high frequency, set up other dummy tasks
 
-        bmiflag = 0;
+      // delay(1);
+    }
+
+    prevTime_T1 = currentTime;
+  }
+
+  // Task 2 : Glow LED2 when BTN is pressed
+  if (((currentTime - prevTime_T3) > interval_T3_SHT40) && (shtflag == 1)) {
+    if (t_and_h_output_switch == 1) {
+      Sht40_Action_Callback();
+      prevTime_T3 = currentTime;
+    }
+  }
+
+  // Task 3 : Read input from serial monitor (0-255) and then write to LED3
 
 
-        shtflag = 0;
+  // Task 4 : print the brightness of LED3 in the serial monitor after every 5 seconds
+  if (((currentTime - prevTime_T4) > interval_T4_BMI270) && (bmiflag == 1)) {
+    unsigned long offset1 = 0;  // 时间偏移量
+    unsigned long currentTime = millis();
 
-        // config_runtime_flag = 0;
+
+    unsigned long startTime = micros();  // 记录开始时间
+    // 执行一些代码
 
 
-        //                       pinMode(24, OUTPUT);
-        // digitalWrite(24, LOW);
-        //               pinMode(9, OUTPUT);
-        // digitalWrite(9, LOW);
-        //       pinMode(10, OUTPUT);
-        // digitalWrite(10, LOW);
-        //  Wire.end();
+
+
+    // pinMode(22, OUTPUT);  //打开IC开关
+    // digitalWrite(22, LOW);
+
+    // if (config_runtime_flag == 0) {
+    //   config_all_sensors();  //我发现放在BLEaction也不行，以为可能还没执行到这个函数，BMI_ADXL_Action就开始执行了，所以导致没有输出，我必须保证在读取前执行这个配置所以只有一种办法，
+    //                          //使用BMI_ADXL_Action的时候调用这个一次，只能一次，不然一直配置，然后用flag表示执行过，当我按了stop，flag为0，下次执行BLE ACTIOND的时候又会仅仅配置一次
+    //   config_runtime_flag = 1;
+    // }
+
+
+    SPI.setDataMode(SPI_MODE3);
+
+
+
+
+
+
+
+    int16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
+    uint8_t lsb_acc_x, msb_acc_x, lsb_acc_y, msb_acc_y, lsb_acc_z, msb_acc_z;  //比如从both更改为acc之后，gyr有前一次的值，我想变为0，我把这里所有给了初始值，但是我发现还是不等于0
+    uint8_t lsb_gyr_x, msb_gyr_x, lsb_gyr_y, msb_gyr_y, lsb_gyr_z, msb_gyr_z;
+    // Burst data read from ACC_x_0_7 to Gyr_8_13
+    byte dataToSend = accel_gyr_addr | READ;
+
+    digitalWrite(14, LOW);
+    SPI.transfer(dataToSend);  //Send register location
+    SPI.transfer(0x00);
+    lsb_acc_x = SPI.transfer(0x00);
+    msb_acc_x = SPI.transfer(0x00);
+    lsb_acc_y = SPI.transfer(0x00);
+    msb_acc_y = SPI.transfer(0x00);
+    lsb_acc_z = SPI.transfer(0x00);
+    msb_acc_z = SPI.transfer(0x00);
+
+    lsb_gyr_x = SPI.transfer(0x00);
+    msb_gyr_x = SPI.transfer(0x00);
+    lsb_gyr_y = SPI.transfer(0x00);
+    msb_gyr_y = SPI.transfer(0x00);
+    lsb_gyr_z = SPI.transfer(0x00);
+    msb_gyr_z = SPI.transfer(0x00);
+    digitalWrite(14, HIGH);
+
+    acc_x = ((int16_t)msb_acc_x << 8) | (int16_t)lsb_acc_x;
+    acc_y = ((int16_t)msb_acc_y << 8) | (int16_t)lsb_acc_y;
+    acc_z = ((int16_t)msb_acc_z << 8) | (int16_t)lsb_acc_z;
+
+    gyr_x = ((int16_t)msb_gyr_x << 8) | (int16_t)lsb_gyr_x;
+    gyr_y = ((int16_t)msb_gyr_y << 8) | (int16_t)lsb_gyr_y;
+    gyr_z = ((int16_t)msb_gyr_z << 8) | (int16_t)lsb_gyr_z;
+
+    Serial.print("acc_x = ");
+    Serial.print(acc_x);
+    Serial.print("\t");
+
+    Serial.print("acc_y = ");
+    Serial.print(acc_y);
+    Serial.print("\t");
+
+    Serial.print("acc_z = ");
+    Serial.print(acc_z);
+    Serial.print("\t");
+
+    Serial.print("gyr_x = ");
+    Serial.print(gyr_x);
+    Serial.print("\t");
+
+    Serial.print("gyr_y = ");
+    Serial.print(gyr_y);
+    Serial.print("\t");
+
+    Serial.print("gyr_z = ");
+    Serial.print(gyr_z);
+    Serial.print("\t");
+
+    Serial.println("");
+    unsigned long endTime = micros();  // 记录结束时间
+
+    unsigned long elapsedTime = endTime - startTime;  // 计算运行时间
+
+
+
+
+    // Serial.print("BMI ST:");
+    // BMI_init_status = bmi2xx.readRegister(INT_STATUS, 2);
+    // Serial.println(BMI_init_status);
+
+
+
+
+    //  Serial.print("sdname=");
+    //Serial.print(sd_filename);
+
+
+
+    int16_t input_data[6] = { acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z };
+    int input_data_size = sizeof(input_data) / sizeof(input_data[0]);
+
+    if (data_compression_control == 1) {
+      int8_t* compressed_data = compress_data.scaleArray(input_data, input_data_size);
+      for (int i = 0; i < 6; i++) {
+        input_data[i] = compressed_data[i];
       }
     }
-    // Send a message over BLE
-    // bleSerial.println("Hello from NRF52832!");
-    //dummy, ble is high frequency, set up other dummy tasks
-
-    // delay(1);
-  }
-
-  prevTime_T1 = currentTime;
-}
-
-// Task 2 : Glow LED2 when BTN is pressed
-if (((currentTime - prevTime_T3) > interval_T3_SHT40) && (shtflag == 1)) {
-  if (t_and_h_output_switch == 1) {
-    Sht40_Action_Callback();
-    prevTime_T3 = currentTime;
-  }
-}
-
-// Task 3 : Read input from serial monitor (0-255) and then write to LED3
-
-
-// Task 4 : print the brightness of LED3 in the serial monitor after every 5 seconds
-if (((currentTime - prevTime_T4) > interval_T4_BMI270) && (bmiflag == 1)) {
-  unsigned long offset1 = 0;  // 时间偏移量
-  unsigned long currentTime = millis();
-
-
-  unsigned long startTime = micros();  // 记录开始时间
-  // 执行一些代码
-
-
-
-
-  // pinMode(22, OUTPUT);  //打开IC开关
-  // digitalWrite(22, LOW);
-
-  // if (config_runtime_flag == 0) {
-  //   config_all_sensors();  //我发现放在BLEaction也不行，以为可能还没执行到这个函数，BMI_ADXL_Action就开始执行了，所以导致没有输出，我必须保证在读取前执行这个配置所以只有一种办法，
-  //                          //使用BMI_ADXL_Action的时候调用这个一次，只能一次，不然一直配置，然后用flag表示执行过，当我按了stop，flag为0，下次执行BLE ACTIOND的时候又会仅仅配置一次
-  //   config_runtime_flag = 1;
-  // }
-
-
-  SPI.setDataMode(SPI_MODE3);
 
 
 
 
 
+    //必须很大，不然会出现乱码
+    // Serial.println("CURRENT TIME.");
+    // Serial.println(currentTime);
+    // offset += sprintf(buffer + offset, "%lu", currentTime);
+    // offset += sprintf(buffer + offset, ",");
 
+    // for (int i = 0; i < 9; i++) {  //这里不能是sizeof input，不然数据是16个
+    //   offset += sprintf(buffer + offset, "%d", input_data[i]);
 
-  int16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
-  uint8_t lsb_acc_x, msb_acc_x, lsb_acc_y, msb_acc_y, lsb_acc_z, msb_acc_z;  //比如从both更改为acc之后，gyr有前一次的值，我想变为0，我把这里所有给了初始值，但是我发现还是不等于0
-  uint8_t lsb_gyr_x, msb_gyr_x, lsb_gyr_y, msb_gyr_y, lsb_gyr_z, msb_gyr_z;
-  // Burst data read from ACC_x_0_7 to Gyr_8_13
-  byte dataToSend = accel_gyr_addr | READ;
+    //   // Add comma delimiter for all elements except the last one
+    //   if (i < 8) {
+    //     offset += sprintf(buffer + offset, ",");
+    //   }
+    // }
+    buffer += String(currentTime);
+    buffer += ",";
 
-  digitalWrite(14, LOW);
-  SPI.transfer(dataToSend);  //Send register location
-  SPI.transfer(0x00);
-  lsb_acc_x = SPI.transfer(0x00);
-  msb_acc_x = SPI.transfer(0x00);
-  lsb_acc_y = SPI.transfer(0x00);
-  msb_acc_y = SPI.transfer(0x00);
-  lsb_acc_z = SPI.transfer(0x00);
-  msb_acc_z = SPI.transfer(0x00);
-
-  lsb_gyr_x = SPI.transfer(0x00);
-  msb_gyr_x = SPI.transfer(0x00);
-  lsb_gyr_y = SPI.transfer(0x00);
-  msb_gyr_y = SPI.transfer(0x00);
-  lsb_gyr_z = SPI.transfer(0x00);
-  msb_gyr_z = SPI.transfer(0x00);
-  digitalWrite(14, HIGH);
-
-  acc_x = ((int16_t)msb_acc_x << 8) | (int16_t)lsb_acc_x;
-  acc_y = ((int16_t)msb_acc_y << 8) | (int16_t)lsb_acc_y;
-  acc_z = ((int16_t)msb_acc_z << 8) | (int16_t)lsb_acc_z;
-
-  gyr_x = ((int16_t)msb_gyr_x << 8) | (int16_t)lsb_gyr_x;
-  gyr_y = ((int16_t)msb_gyr_y << 8) | (int16_t)lsb_gyr_y;
-  gyr_z = ((int16_t)msb_gyr_z << 8) | (int16_t)lsb_gyr_z;
-
-  Serial.print("acc_x = ");
-  Serial.print(acc_x);
-  Serial.print("\t");
-
-  Serial.print("acc_y = ");
-  Serial.print(acc_y);
-  Serial.print("\t");
-
-  Serial.print("acc_z = ");
-  Serial.print(acc_z);
-  Serial.print("\t");
-
-  Serial.print("gyr_x = ");
-  Serial.print(gyr_x);
-  Serial.print("\t");
-
-  Serial.print("gyr_y = ");
-  Serial.print(gyr_y);
-  Serial.print("\t");
-
-  Serial.print("gyr_z = ");
-  Serial.print(gyr_z);
-  Serial.print("\t");
-
-  Serial.println("");
-  unsigned long endTime = micros();  // 记录结束时间
-
-  unsigned long elapsedTime = endTime - startTime;  // 计算运行时间
-
-
-
-
-  // Serial.print("BMI ST:");
-  // BMI_init_status = bmi2xx.readRegister(INT_STATUS, 2);
-  // Serial.println(BMI_init_status);
-
-
-
-
-  //  Serial.print("sdname=");
-  //Serial.print(sd_filename);
-
-
-
-  int16_t input_data[6] = { acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z };
-  int input_data_size = sizeof(input_data) / sizeof(input_data[0]);
-
-  if (compress_switch == 1) {
-    int8_t* compressed_data = compress_data.scaleArray(input_data, input_data_size);
     for (int i = 0; i < 6; i++) {
-      input_data[i] = compressed_data[i];
+      buffer += String(input_data[i]);
+
+      // Add comma delimiter for all elements except the last one
+      if (i < 5) {
+        buffer += ",";
+      }
     }
-  }
-
-
-
-
-
-  //必须很大，不然会出现乱码
-  // Serial.println("CURRENT TIME.");
-  // Serial.println(currentTime);
-  // offset += sprintf(buffer + offset, "%lu", currentTime);
-  // offset += sprintf(buffer + offset, ",");
-
-  // for (int i = 0; i < 9; i++) {  //这里不能是sizeof input，不然数据是16个
-  //   offset += sprintf(buffer + offset, "%d", input_data[i]);
-
-  //   // Add comma delimiter for all elements except the last one
-  //   if (i < 8) {
-  //     offset += sprintf(buffer + offset, ",");
-  //   }
-  // }
-  buffer += String(currentTime);
-  buffer += ",";
-
-  for (int i = 0; i < 6; i++) {
-    buffer += String(input_data[i]);
-
-    // Add comma delimiter for all elements except the last one
-    if (i < 5) {
-      buffer += ",";
-    }
-  }
-  buffer += "\n";
-  //Serial.println("buffer.length().");
-  //Serial.println(buffer.length());
-  //buffer[offset++] = '\n';  //最后添加换行
-  // Serial.println("offst...");
-  //   Serial.println(offset);
-  if (buffer.length() > 4096) {
-
-    //delay(5);
-    //
-    //不能在开头初始化，不然会影响spi传输，
-    SD.begin(27);
-    //delay(5);
-    //my_sd_File = SD.open("test.csv", FILE_WRITE);
-    // int sd_file_length = strlen(sd_filename_store_outside_loop);
-    // char sd_name_buffer[sd_file_length + 1];
-    // strcpy(sd_name_buffer, sd_filename);
-    Serial.println("write successfully...");
-    Serial.println(sd_filename);
-    my_sd_File = SD.open(sd_filename, FILE_WRITE);
-
-    if (my_sd_File) {
+    buffer += "\n";
+    //Serial.println("buffer.length().");
+    //Serial.println(buffer.length());
+    //buffer[offset++] = '\n';  //最后添加换行
+    // Serial.println("offst...");
+    //   Serial.println(offset);
+    if (buffer.length() > 5120) {
 
       //delay(5);
+      //
+      //不能在开头初始化，不然会影响spi传输，
+      SD.begin(27);
+      //delay(5);
+      //my_sd_File = SD.open("test.csv", FILE_WRITE);
+      // int sd_file_length = strlen(sd_filename_store_outside_loop);
+      // char sd_name_buffer[sd_file_length + 1];
+      // strcpy(sd_name_buffer, sd_filename);
+      Serial.println("write successfully...");
+      Serial.println(sd_filename);
+      my_sd_File = SD.open(sd_filename, FILE_WRITE);
 
-      // Serial.print("Writing to data.csv...");
-      my_sd_File.write((const uint8_t*)buffer.c_str(), buffer.length());
-      offset = 0;          //名字太长的受offet超过5000了，说明根本不没有进入这里
-      my_sd_File.close();  //
-      buffer = "";
-      // Serial.println("sd_filename wonr?");
-      // Serial.println(sd_filename);
+      if (my_sd_File) {
+
+        //delay(5);
+
+        // Serial.print("Writing to data.csv...");
+        my_sd_File.write((const uint8_t*)buffer.c_str(), buffer.length());
+        offset = 0;          //名字太长的受offet超过5000了，说明根本不没有进入这里
+        my_sd_File.close();  //
+        buffer = "";
+        // Serial.println("sd_filename wonr?");
+        // Serial.println(sd_filename);
+      }
+    }
+
+    prevTime_T4 = currentTime;
+
+    if (compressive_sensing_control == 0) {
+      //haha, i dont do any thing here, good luck.
+    }
+
+    if (compressive_sensing_control == 1) {
+      automatical_time_interval_counter++;
+      gyr_detecter = gyr_detecter + abs(gyr_z);
+      if (automatical_time_interval_counter == 5) {
+        gyr_detecter = gyr_detecter / 5;  // 玄学，如果这里没有除法，写入文件不会出错
+        gyr_detecter = (int)gyr_detecter;
+
+        automatical_time_interval_curve(gyr_detecter);
+        automatical_time_interval_counter = 0;
+        gyr_detecter = 0;
+      }
+    }
+    if (compressive_sensing_control == 2) {
+      automatical_time_interval_counter++;
+      gyr_detecter = gyr_detecter + abs(gyr_z);
+      if (automatical_time_interval_counter == 5) {
+        gyr_detecter = gyr_detecter / 5;  // 玄学，如果这里没有除法，写入文件不会出错
+        gyr_detecter = (int)gyr_detecter;
+
+        automatical_time_interval_fast(gyr_detecter);
+        automatical_time_interval_counter = 0;
+        gyr_detecter = 0;
+      }
     }
   }
-
-  prevTime_T4 = currentTime;
-
-  if (automatical_time_interval_function_switch == 1) {
-    automatical_time_interval_counter++;
-    gyr_detecter = gyr_detecter + abs(gyr_z);
-    if (automatical_time_interval_counter == 20) {
-      gyr_detecter = gyr_detecter / 20;  // 玄学，如果这里没有除法，写入文件不会出错
-      gyr_detecter = (int)gyr_detecter;
-      automatical_time_interval_curve(gyr_detecter);
-      automatical_time_interval_counter = 0;
-      gyr_detecter = 0;
-    }
-  }
-}
 }
 
 void Sht40_Setup() {
@@ -574,6 +598,8 @@ void BLESetup_Callback() {
   blePeripheral.addAttribute(acc_range_Characteristic);
   blePeripheral.addAttribute(gyr_range_Characteristic);
   blePeripheral.addAttribute(bmi_hz_Characteristic);
+    blePeripheral.addAttribute(compressive_sensing_Characteristic);
+  blePeripheral.addAttribute(data_compression_Characteristic);
   blePeripheral.addAttribute(te_hu_Characteristic);
   blePeripheral.addAttribute(infrared_Characteristic);
 
@@ -679,14 +705,14 @@ void config_all_sensors() {
   bmi_acc_config = received_config_from_ble[3];
   bmi_gyr_config = received_config_from_ble[3];
 
+  compressive_sensing_control = received_config_from_ble[4];
+  data_compression_control = received_config_from_ble[5];
 
 
 
+  te_hu_control = received_config_from_ble[6];
 
-
-  te_hu_control = received_config_from_ble[4];
-
-  infrared_control = received_config_from_ble[5];
+  infrared_control = received_config_from_ble[7];
 
 
   Serial.println(gyr_range_control);
@@ -720,7 +746,7 @@ void motion_sensor_inteval_set(uint8_t bmi_hz_configure) {
 
 // void automatical_time_interval(int16_t x, int16_t y, int16_t z) {
 
-void automatical_time_interval(int x) {
+void automatical_time_interval_fast(int x) {
   int testnumer = x;
   //int testnumer = abs(x) + abs(y) + abs(z);
   Serial.print("testnumer:");
@@ -729,19 +755,19 @@ void automatical_time_interval(int x) {
   if (testnumer <= 100) {
     motion_sensor_time_interval = 99;
   }
-  if (testnumer >= 101 && testnumer <= 200) {
+  if (testnumer >= 101 && testnumer <= 500) {
     motion_sensor_time_interval = 79;
   }
-  if (testnumer >= 201 && testnumer <= 400) {
+  if (testnumer >= 501 && testnumer <= 1000) {
     motion_sensor_time_interval = 59;
   }
-  if (testnumer >= 401 && testnumer <= 600) {
+  if (testnumer >= 1001 && testnumer <= 2000) {
     motion_sensor_time_interval = 39;
   }
-  if (testnumer >= 601 && testnumer <= 800) {
+  if (testnumer >= 2001 && testnumer <= 3000) {
     motion_sensor_time_interval = 19;
   }
-  if (testnumer >= 801) {
+  if (testnumer >= 3001) {
     motion_sensor_time_interval = 9;
   }
   interval_T4_BMI270 = motion_sensor_time_interval;
@@ -754,11 +780,11 @@ void automatical_time_interval_curve(int x) {
   Serial.print("testnumer:");
   Serial.print(testnumer);
   Serial.println("");
-  if (testnumer >= 500) {
+  if (testnumer > 2000) {
     if (motion_sensor_time_interval > 10) {
       motion_sensor_time_interval = motion_sensor_time_interval - 10;
     }
-  } else if (testnumer <= 500) {
+  } else if (testnumer < 2000) {
     if (motion_sensor_time_interval < 100) {
       motion_sensor_time_interval = motion_sensor_time_interval + 10;
     }
